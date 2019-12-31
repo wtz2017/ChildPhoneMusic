@@ -63,7 +63,6 @@ public class MusicGridAdapter extends BaseAdapter {
     @Override
     public View getView(final int position, View convertView, ViewGroup parent) {
         ViewHolder holder = null;
-        final Item item = (Item) getItem(position);
         if (convertView == null) {
             holder = new ViewHolder();
             convertView = LayoutInflater.from(mContext).inflate(R.layout.item_music_gridview, parent, false);
@@ -73,13 +72,15 @@ public class MusicGridAdapter extends BaseAdapter {
                 mItemLayoutParams.height = mItemHeight;
             }
             convertView.setLayoutParams(mItemLayoutParams);
-            holder.id = item.path;
+
             holder.imageView = (ImageView) convertView.findViewById(R.id.iv_img);
             holder.name = convertView.findViewById(R.id.tv_name);
             convertView.setTag(holder);
         } else {
             holder = (ViewHolder) convertView.getTag();
         }
+        final Item item = (Item) getItem(position);
+        holder.id = item.path;
 
         holder.name.setText(item.name);
         if (item.type == Item.TYPE_DIR) {
