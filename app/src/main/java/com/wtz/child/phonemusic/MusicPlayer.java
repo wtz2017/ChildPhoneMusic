@@ -62,7 +62,7 @@ public class MusicPlayer extends AppCompatActivity implements View.OnClickListen
     private ImageView ivNext;
 
     private static final int UPDATE_PLAY_TIME_INTERVAL = 300;
-    private static final int DELAY_UPDATE_ALBUM_TIME = 1600;
+    private static final int DELAY_UPDATE_ALBUM_TIME = 700;
     private static final int MSG_UPDATE_PLAY_TIME = 1;
     private static final int MSG_UPDATE_ALBUM = 2;
     private Handler mHandler = new Handler(Looper.getMainLooper()) {
