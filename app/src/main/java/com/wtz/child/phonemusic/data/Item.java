@@ -3,6 +3,8 @@ package com.wtz.child.phonemusic.data;
 import android.os.Parcel;
 import android.os.Parcelable;
 
+import androidx.annotation.NonNull;
+
 public class Item implements Parcelable, Comparable {
 
     public static final int TYPE_DIR = 1;
@@ -62,5 +64,20 @@ public class Item implements Parcelable, Comparable {
             }
         }
         return ret;
+    }
+
+    @NonNull
+    @Override
+    public String toString() {
+        StringBuilder builder = new StringBuilder();
+        builder.append("Item[");
+        builder.append("type=");
+        builder.append(type);
+        builder.append(";name=");
+        builder.append(name);
+        builder.append(";path=");
+        builder.append(path);
+        builder.append("]");
+        return builder.toString();
     }
 }

@@ -88,15 +88,50 @@ public class MusicPlayer extends AppCompatActivity implements View.OnClickListen
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        LogUtils.d(TAG, "onCreate");
         super.onCreate(savedInstanceState);
 
-        Intent intent = getIntent();
+        if (!initData(getIntent())) return;
+
+        setContentView(R.layout.activity_music_player);
+        initViews();
+
+        Intent playService = new Intent(this, MusicService.class);
+        bindService(playService, mConnection, Context.BIND_AUTO_CREATE);
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        // 由于设置了 singleInstance 模式，按了 Home 键隐藏后再次进入时会调用此方法
+        LogUtils.d(TAG, "onNewIntent " + intent);
+        super.onNewIntent(intent);
+
+        if (!initData(intent)) return;
+
+        startNewAudio();
+    }
+
+    @Override
+    protected void onStart() {
+        LogUtils.d(TAG, "onStart");
+        super.onStart();
+    }
+
+    @Override
+    protected void onResume() {
+        LogUtils.d(TAG, "onResume");
+        super.onResume();
+    }
+
+    private boolean initData(Intent intent) {
         List<Item> list = intent.getParcelableArrayListExtra(KEY_MUSIC_LIST);
         if (list == null || list.isEmpty()) {
             finish();
-            return;
+            LogUtils.e(TAG, "initData failed: list is null or empty");
+            return false;
         }
 
+        mMusicList.clear();
         mMusicList.addAll(list);
         mSize = mMusicList.size();
         mIndex = intent.getIntExtra(KEY_MUSIC_INDEX, 0);
@@ -104,12 +139,8 @@ public class MusicPlayer extends AppCompatActivity implements View.OnClickListen
             mIndex = 0;
         }
         mCurrentItem = mMusicList.get(mIndex);
-
-        setContentView(R.layout.activity_music_player);
-        initViews();
-
-        Intent playService = new Intent(this, MusicService.class);
-        bindService(playService, mConnection, Context.BIND_AUTO_CREATE);
+        LogUtils.d(TAG, "initData " + mCurrentItem);
+        return true;
     }
 
     private void initViews() {
@@ -212,6 +243,7 @@ public class MusicPlayer extends AppCompatActivity implements View.OnClickListen
         @Override
         public void onServiceConnected(ComponentName className,
                                        IBinder service) {
+            LogUtils.d(TAG, "onServiceConnected");
             // We've bound to LocalService, cast the IBinder and get LocalService instance
             MusicService.LocalBinder binder = (MusicService.LocalBinder) service;
             mService = binder.getService();
@@ -223,6 +255,7 @@ public class MusicPlayer extends AppCompatActivity implements View.OnClickListen
 
         @Override
         public void onServiceDisconnected(ComponentName arg0) {
+            LogUtils.e(TAG, "onServiceDisconnected");
             mBound = false;
         }
     };
@@ -248,7 +281,7 @@ public class MusicPlayer extends AppCompatActivity implements View.OnClickListen
         @Override
         public void onPrepared(MediaPlayer mp) {
             mDurationMsec = getDuration();
-            LogUtils.d(TAG, "mDurationMsec=" + mDurationMsec);
+            LogUtils.d(TAG, "onPrepared mDurationMsec=" + mDurationMsec);
             mPlaySeekBar.setMax(mDurationMsec);
             mDurationText = DateTimeUtil.changeRemainTimeToHms(mDurationMsec);
             play();
@@ -258,6 +291,7 @@ public class MusicPlayer extends AppCompatActivity implements View.OnClickListen
     private MediaPlayer.OnCompletionListener mOnCompletionListener = new MediaPlayer.OnCompletionListener() {
         @Override
         public void onCompletion(MediaPlayer mp) {
+            LogUtils.d(TAG, "onCompletion");
             next();
         }
     };
@@ -443,9 +477,23 @@ public class MusicPlayer extends AppCompatActivity implements View.OnClickListen
     }
 
     @Override
+    protected void onPause() {
+        LogUtils.d(TAG, "onPause");
+        super.onPause();
+    }
+
+    @Override
+    protected void onStop() {
+        LogUtils.d(TAG, "onStop");
+        super.onStop();
+    }
+
+    @Override
     protected void onDestroy() {
+        LogUtils.d(TAG, "onDestroy");
         if (mAsyncTaskExecutor != null) {
             mAsyncTaskExecutor.shutdown();
+            mAsyncTaskExecutor = null;
         }
         stop();
         releasePlayService();
@@ -453,6 +501,10 @@ public class MusicPlayer extends AppCompatActivity implements View.OnClickListen
             unbindService(mConnection);
             mService = null;
             mBound = false;
+        }
+        if (mMusicList != null) {
+            mMusicList.clear();
+            mMusicList = null;
         }
         mHandler.removeCallbacksAndMessages(null);
         super.onDestroy();

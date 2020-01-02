@@ -81,6 +81,13 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
     }
 
     @Override
+    protected void onNewIntent(Intent intent) {
+        // 由于是桌面应用的主 Activity，且设置了 singleInstance 模式，按 Home 键时会调用此方法
+        LogUtils.d(TAG, "onNewIntent " + intent);
+        super.onNewIntent(intent);
+    }
+
+    @Override
     public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
         LogUtils.d(TAG, "onRequestPermissionsResult requestCode=" + requestCode);
         mPermissionHandler.handleActivityRequestPermissionsResult(requestCode, permissions, grantResults);

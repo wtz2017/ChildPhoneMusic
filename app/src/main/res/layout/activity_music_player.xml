@@ -10,10 +10,9 @@
 
     <ImageView
         android:id="@+id/iv_album"
-        android:layout_marginTop="@dimen/dp_6"
-        android:layout_width="@dimen/dp_200"
+        android:layout_width="@dimen/dp_300"
         android:layout_gravity="center_horizontal"
-        android:layout_height="@dimen/dp_200"
+        android:layout_height="@dimen/dp_250"
         android:layout_marginBottom="@dimen/dp_6"
         android:scaleType="fitCenter"
         android:src="@drawable/icon_music" />
@@ -21,17 +20,19 @@
     <TextView
         android:id="@+id/tv_name"
         android:layout_marginTop="@dimen/dp_10"
+        android:layout_marginLeft="@dimen/dp_5"
+        android:layout_marginRight="@dimen/dp_5"
         style="@style/TextStyle"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:ellipsize="marquee"
+        android:ellipsize="end"
         android:gravity="center"
-        android:singleLine="true"
+        android:maxLines="2"
         android:text="名称" />
 
     <TextView
         android:id="@+id/tv_play_time"
-        android:layout_marginTop="@dimen/dp_50"
+        android:layout_marginTop="@dimen/dp_30"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:textSize="@dimen/sp_22"
