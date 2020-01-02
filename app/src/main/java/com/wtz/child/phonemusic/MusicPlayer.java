@@ -4,7 +4,9 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.ServiceConnection;
+import android.content.res.Configuration;
 import android.graphics.Bitmap;
+import android.graphics.drawable.Drawable;
 import android.media.MediaPlayer;
 import android.os.Bundle;
 import android.os.Handler;
@@ -14,7 +16,10 @@ import android.os.Message;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.Window;
+import android.view.WindowManager;
 import android.widget.ImageView;
+import android.widget.LinearLayout;
 import android.widget.SeekBar;
 import android.widget.TextView;
 
@@ -24,15 +29,18 @@ import androidx.appcompat.app.AppCompatActivity;
 import com.squareup.picasso.Picasso;
 import com.wtz.child.phonemusic.data.Item;
 import com.wtz.child.phonemusic.utils.AsyncTaskExecutor;
+import com.wtz.child.phonemusic.utils.BitmapUtils;
 import com.wtz.child.phonemusic.utils.DateTimeUtil;
 import com.wtz.child.phonemusic.utils.LogUtils;
 import com.wtz.child.phonemusic.utils.MusicIcon;
+import com.wtz.child.phonemusic.utils.PicassoRoundTransformation;
 import com.wtz.child.phonemusic.utils.ScreenUtils;
 
 import java.util.ArrayList;
 import java.util.List;
 
-public class MusicPlayer extends AppCompatActivity implements View.OnClickListener, View.OnTouchListener {
+public class MusicPlayer extends AppCompatActivity implements View.OnClickListener,
+        View.OnTouchListener, SeekBar.OnSeekBarChangeListener {
     private static final String TAG = MusicPlayer.class.getSimpleName();
 
     public static final String KEY_MUSIC_LIST = "key_music_list";
@@ -46,6 +54,8 @@ public class MusicPlayer extends AppCompatActivity implements View.OnClickListen
     private ImageView ivAlbum;
     private int mAlbumWidth;
     private int mAlbumHeight;
+    private Drawable mAlbumDrawable;
+    private int mRoundPx;
 
     private TextView tvName;
 
@@ -91,10 +101,13 @@ public class MusicPlayer extends AppCompatActivity implements View.OnClickListen
         LogUtils.d(TAG, "onCreate");
         super.onCreate(savedInstanceState);
 
+        requestWindowFeature(Window.FEATURE_NO_TITLE);
+        getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN,
+                WindowManager.LayoutParams.FLAG_FULLSCREEN);
+
         if (!initData(getIntent())) return;
 
-        setContentView(R.layout.activity_music_player);
-        initViews();
+        configView();
 
         Intent playService = new Intent(this, MusicService.class);
         bindService(playService, mConnection, Context.BIND_AUTO_CREATE);
@@ -123,6 +136,28 @@ public class MusicPlayer extends AppCompatActivity implements View.OnClickListen
         super.onResume();
     }
 
+    @Override
+    public void onConfigurationChanged(@NonNull Configuration newConfig) {
+        LogUtils.w(TAG, "onConfigurationChanged newConfig:" + newConfig);
+        super.onConfigurationChanged(newConfig);
+
+        if (ivAlbum != null) {
+            mAlbumDrawable = ivAlbum.getDrawable();
+        }
+        configView();
+    }
+
+    private void configView() {
+        if (ScreenUtils.isPortrait(this)) {
+            // 竖屏
+            setContentView(R.layout.activity_music_player_portrait);
+        } else {
+            // 横屏
+            setContentView(R.layout.activity_music_player_landscape);
+        }
+        initViews();
+    }
+
     private boolean initData(Intent intent) {
         List<Item> list = intent.getParcelableArrayListExtra(KEY_MUSIC_LIST);
         if (list == null || list.isEmpty()) {
@@ -145,8 +180,13 @@ public class MusicPlayer extends AppCompatActivity implements View.OnClickListen
 
     private void initViews() {
         ivAlbum = findViewById(R.id.iv_album);
-        ivAlbum.setImageResource(R.drawable.icon_music);
-        mAlbumWidth = mAlbumHeight = (int) getResources().getDimension(R.dimen.dp_150);
+        setAlbumLayout(ivAlbum);
+        if (mAlbumDrawable != null) {
+            ivAlbum.setImageDrawable(mAlbumDrawable);
+        } else {
+            ivAlbum.setImageResource(R.drawable.icon_music);
+        }
+        mRoundPx = (int) getResources().getDimension(R.dimen.dp_10);
 
         tvName = findViewById(R.id.tv_name);
         tvName.setText(mMusicList.get(mIndex).name);
@@ -155,30 +195,8 @@ public class MusicPlayer extends AppCompatActivity implements View.OnClickListen
 
         mPlaySeekBar = findViewById(R.id.seek_bar_play);
         setSeekbarWith(mPlaySeekBar);
-        mPlaySeekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
-            @Override
-            public void onProgressChanged(SeekBar seekBar, int i, boolean b) {
-                if (isSeeking) {
-                    // 因为主动 seek 导致的 seekbar 变化，此时只需要更新时间
-                    updatePlayTime();
-                } else {
-                    // 因为实际播放时间变化而设置 seekbar 导致变化，什么都不用做
-                }
-            }
-
-            @Override
-            public void onStartTrackingTouch(SeekBar seekBar) {
-                LogUtils.d(TAG, "mPlaySeekBar onStartTrackingTouch");
-                isSeeking = true;
-            }
-
-            @Override
-            public void onStopTrackingTouch(SeekBar seekBar) {
-                LogUtils.d(TAG, "mPlaySeekBar onStopTrackingTouch");
-                seekTo(seekBar.getProgress());
-                isSeeking = false;
-            }
-        });
+        mPlaySeekBar.setMax(mDurationMsec);// 在重新设置 seekbar 宽度后，需要重新设置其最大值
+        mPlaySeekBar.setOnSeekBarChangeListener(this);
 
         ivPre = (ImageView) this.findViewById(R.id.iv_pre);
         ivPre.setOnClickListener(this);
@@ -193,13 +211,60 @@ public class MusicPlayer extends AppCompatActivity implements View.OnClickListen
         ivNext.setOnTouchListener(this);
     }
 
+    private void setAlbumLayout(ImageView album) {
+        int[] wh = ScreenUtils.getScreenPixels(this);
+        int albumWidth;
+        if (ScreenUtils.isPortrait(this)) {
+            albumWidth = (int) Math.round(wh[0] * 0.85);
+        } else {
+            albumWidth = (int) Math.round(wh[0] * 0.5 * 0.85);
+        }
+        if (albumWidth > wh[1]) {
+            albumWidth = (int) Math.round(wh[1] * 0.85);
+        }
+
+        mAlbumHeight = mAlbumWidth = albumWidth;
+        LinearLayout.LayoutParams lp = (LinearLayout.LayoutParams) album.getLayoutParams();
+        lp.width = albumWidth;
+        lp.height = albumWidth;
+        album.setLayoutParams(lp);
+    }
+
     private void setSeekbarWith(SeekBar seekbar) {
         int[] wh = ScreenUtils.getScreenPixels(this);
-        int seekWith = (int) Math.round(0.75 * wh[0]);
+        int seekWidth;
+        if (ScreenUtils.isPortrait(this)) {
+            seekWidth = (int) Math.round(wh[0] * 0.75);
+        } else {
+            seekWidth = (int) Math.round(wh[0] * 0.5 * 0.75);
+        }
 
         ViewGroup.LayoutParams lp = seekbar.getLayoutParams();
-        lp.width = seekWith;
+        lp.width = seekWidth;
         seekbar.setLayoutParams(lp);
+    }
+
+    @Override
+    public void onProgressChanged(SeekBar seekBar, int i, boolean b) {
+        if (isSeeking) {
+            // 因为主动 seek 导致的 seekbar 变化，此时只需要更新时间
+            updatePlayTime();
+        } else {
+            // 因为实际播放时间变化而设置 seekbar 导致变化，什么都不用做
+        }
+    }
+
+    @Override
+    public void onStartTrackingTouch(SeekBar seekBar) {
+        LogUtils.d(TAG, "mPlaySeekBar onStartTrackingTouch");
+        isSeeking = true;
+    }
+
+    @Override
+    public void onStopTrackingTouch(SeekBar seekBar) {
+        LogUtils.d(TAG, "mPlaySeekBar onStopTrackingTouch");
+        seekTo(seekBar.getProgress());
+        isSeeking = false;
     }
 
     @Override
@@ -453,7 +518,11 @@ public class MusicPlayer extends AppCompatActivity implements View.OnClickListen
                     mHandler.post(new Runnable() {
                         @Override
                         public void run() {
-                            ivAlbum.setImageBitmap(bitmap);
+                            Bitmap result = BitmapUtils.roundImageCorner(bitmap, BitmapUtils.RoundCornerType.ALL, mRoundPx);
+                            if (result != bitmap) {
+                                bitmap.recycle();
+                            }
+                            ivAlbum.setImageBitmap(result);
                         }
                     });
                 } else {
@@ -465,6 +534,7 @@ public class MusicPlayer extends AppCompatActivity implements View.OnClickListen
                                     .load(MusicIcon.getRandomIconUrl(mCurrentItem.name))
                                     // 解决 OOM 问题
                                     .resize(mAlbumWidth, mAlbumHeight)
+                                    .transform(new PicassoRoundTransformation(mRoundPx))
                                     .centerCrop()// 需要先调用fit或resize设置目标大小，否则会报错：Center crop requires calling resize with positive width and height
                                     .placeholder(R.drawable.icon_music)
                                     .noFade()
@@ -495,6 +565,7 @@ public class MusicPlayer extends AppCompatActivity implements View.OnClickListen
             mAsyncTaskExecutor.shutdown();
             mAsyncTaskExecutor = null;
         }
+        mAlbumDrawable = null;
         stop();
         releasePlayService();
         if (mBound) {

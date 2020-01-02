@@ -4,6 +4,7 @@ import android.Manifest;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.res.Configuration;
 import android.os.Bundle;
 import android.os.Environment;
 import android.os.Handler;
@@ -16,6 +17,7 @@ import android.widget.GridView;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.wtz.child.phonemusic.adapter.MusicGridAdapter;
@@ -36,9 +38,12 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
 
     private TextView mCurrentPathView;
 
-    private static final int GRIDVIEW_COLUMNS = 3;
     private static final int GRIDVIEW_VERTICAL_SPACE_DIP = 12;
     private static final int GRIDVIEW_HORIZONTAL_SPACE_DIP = 12;
+    private int mColumnCounts;
+    private int mColumnWidth;
+    private int mItemWidth;
+    private int mItemHeight;
 
     private GridView mGridView;
     private MusicGridAdapter mGridAdapter;
@@ -73,8 +78,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         LogUtils.d(TAG, "onCreate");
         super.onCreate(savedInstanceState);
 
-        setContentView(R.layout.activity_main);
-        initViews();
+        configView();
 
         mPermissionHandler = new PermissionHandler(this, mPermissionHandleListener);
         mPermissionHandler.handleCommonPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE);
@@ -85,6 +89,25 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         // 由于是桌面应用的主 Activity，且设置了 singleInstance 模式，按 Home 键时会调用此方法
         LogUtils.d(TAG, "onNewIntent " + intent);
         super.onNewIntent(intent);
+    }
+
+    @Override
+    protected void onStart() {
+        LogUtils.d(TAG, "onStart");
+        super.onStart();
+    }
+
+    @Override
+    protected void onResume() {
+        LogUtils.d(TAG, "onResume");
+        super.onResume();
+    }
+
+    @Override
+    public void onConfigurationChanged(@NonNull Configuration newConfig) {
+        LogUtils.w(TAG, "onConfigurationChanged newConfig:" + newConfig);
+        super.onConfigurationChanged(newConfig);
+        configView();
     }
 
     @Override
@@ -114,25 +137,46 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                 }
             };
 
+    private void configView() {
+        setContentView(R.layout.activity_main);
+        configGrid();
+        initViews();
+    }
+
+    private void configGrid() {
+        if (ScreenUtils.isPortrait(this)) {
+            // 竖屏
+            mColumnCounts = 3;
+        } else {
+            // 横屏
+            mColumnCounts = 5;
+        }
+        int[] wh = ScreenUtils.getScreenPixels(MainActivity.this);
+        mColumnWidth = wh[0] / mColumnCounts;
+
+        int horizontalSapce = ScreenUtils.dip2px(MainActivity.this, GRIDVIEW_HORIZONTAL_SPACE_DIP);
+        mItemWidth = mColumnWidth - horizontalSapce * 2;
+
+        int nameHeight = (int) getResources().getDimension(R.dimen.sp_20);
+        int margin = (int) getResources().getDimension(R.dimen.dp_6);
+        mItemHeight = mItemWidth + margin + nameHeight;
+    }
+
     private void initViews() {
         mCurrentPathView = findViewById(R.id.tv_path);
         mCurrentPathView.setText(mLastAudioPath);
 
         mGridView = findViewById(R.id.gridView_music);
-        mGridView.setNumColumns(GRIDVIEW_COLUMNS);
-
-        int[] wh = ScreenUtils.getScreenPixels(MainActivity.this);
-        int columnWidth = wh[0] / GRIDVIEW_COLUMNS;
-        mGridView.setColumnWidth(columnWidth);
-
+        mGridView.setNumColumns(mColumnCounts);
+        mGridView.setColumnWidth(mColumnWidth);
         int verticalSapce = ScreenUtils.dip2px(MainActivity.this, GRIDVIEW_VERTICAL_SPACE_DIP);
         mGridView.setVerticalSpacing(verticalSapce);
 
-        int horizontalSapce = ScreenUtils.dip2px(MainActivity.this, GRIDVIEW_HORIZONTAL_SPACE_DIP);
-        int itemWidth = columnWidth - horizontalSapce * 2;
-        int nameHeight = (int) (getResources().getDimension(R.dimen.sp_20) + getResources().getDimension(R.dimen.dp_6));
-        int itemHeight = itemWidth + nameHeight;
-        mGridAdapter = new MusicGridAdapter(MainActivity.this, mTotalList, itemWidth, itemHeight, mHandler);
+        if (mGridAdapter == null) {
+            mGridAdapter = new MusicGridAdapter(MainActivity.this, mTotalList, mItemWidth, mItemHeight, mHandler);
+        } else {
+            mGridAdapter.updateLayout(mTotalList, mItemWidth, mItemHeight);
+        }
         mGridView.setAdapter(mGridAdapter);
         mGridView.setOnItemClickListener(this);
     }
@@ -143,18 +187,6 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         mSp = getSharedPreferences(SP_NAME, Context.MODE_PRIVATE);
         mLastAudioPath = mSp.getString(SP_KEY_LAST_AUDIO_PATH, mRootPath);
         mCurrentPathView.setText(mLastAudioPath);
-    }
-
-    @Override
-    protected void onStart() {
-        LogUtils.d(TAG, "onStart");
-        super.onStart();
-    }
-
-    @Override
-    protected void onResume() {
-        LogUtils.d(TAG, "onResume");
-        super.onResume();
     }
 
     @Override

@@ -14,8 +14,10 @@ import android.widget.TextView;
 import com.squareup.picasso.Picasso;
 import com.wtz.child.phonemusic.data.Item;
 import com.wtz.child.phonemusic.R;
+import com.wtz.child.phonemusic.utils.BitmapUtils;
 import com.wtz.child.phonemusic.utils.LogUtils;
 import com.wtz.child.phonemusic.utils.MusicIcon;
+import com.wtz.child.phonemusic.utils.PicassoRoundTransformation;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -29,6 +31,7 @@ public class MusicGridAdapter extends BaseAdapter {
     private int mItemWidth;
     private int mItemHeight;
     private AbsListView.LayoutParams mItemLayoutParams;
+    private int mRoundPx;
     private Handler mHandler;
 
     public MusicGridAdapter(Context context, List<Item> dataList, int itemWidth, int itemHeight, Handler handler) {
@@ -37,6 +40,19 @@ public class MusicGridAdapter extends BaseAdapter {
         mItemWidth = itemWidth;
         mItemHeight = itemHeight;
         mHandler = handler;
+        mRoundPx = (int) context.getResources().getDimension(R.dimen.dp_10);
+    }
+
+    public void updateLayout(List<Item> dataList, int itemWidth, int itemHeight) {
+        mDataList.clear();
+        mDataList.addAll(dataList);
+
+        mItemWidth = itemWidth;
+        mItemHeight = itemHeight;
+        if (mItemLayoutParams != null) {
+            mItemLayoutParams.width = mItemWidth;
+            mItemLayoutParams.height = mItemHeight;
+        }
     }
 
     public void updateData(List<Item> dataList) {
@@ -102,7 +118,11 @@ public class MusicGridAdapter extends BaseAdapter {
                         mHandler.post(new Runnable() {
                             @Override
                             public void run() {
-                                finalHolder.imageView.setImageBitmap(bitmap);
+                                Bitmap result = BitmapUtils.roundImageCorner(bitmap, BitmapUtils.RoundCornerType.ALL, mRoundPx);
+                                if (result != bitmap) {
+                                    bitmap.recycle();
+                                }
+                                finalHolder.imageView.setImageBitmap(result);
                             }
                         });
                     } else {
@@ -114,6 +134,7 @@ public class MusicGridAdapter extends BaseAdapter {
                                         .load(MusicIcon.getRandomIconUrl(item.name))
                                         // 解决 OOM 问题
                                         .resize(mItemLayoutParams.width, mItemLayoutParams.height)
+                                        .transform(new PicassoRoundTransformation(mRoundPx))
                                         .centerCrop()// 需要先调用fit或resize设置目标大小，否则会报错：Center crop requires calling resize with positive width and height
                                         .placeholder(R.drawable.icon_music)
                                         .noFade()

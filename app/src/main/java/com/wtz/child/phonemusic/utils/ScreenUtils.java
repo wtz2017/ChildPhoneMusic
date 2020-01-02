@@ -1,6 +1,7 @@
 package com.wtz.child.phonemusic.utils;
 
 import android.content.Context;
+import android.content.res.Configuration;
 import android.content.res.Resources;
 import android.os.Build;
 import android.util.DisplayMetrics;
@@ -10,6 +11,11 @@ import android.view.WindowManager;
 import java.lang.reflect.Method;
 
 public class ScreenUtils {
+
+    public static boolean isPortrait(Context context) {
+        return context.getResources().getConfiguration().orientation
+                == Configuration.ORIENTATION_PORTRAIT;
+    }
 
     /**
      * 获取手机屏幕分辨率
