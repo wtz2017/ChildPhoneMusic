@@ -1,6 +1,5 @@
 package com.wtz.child.phonemusic;
 
-import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.Service;
@@ -11,7 +10,6 @@ import android.net.Uri;
 import android.os.Binder;
 import android.os.Build;
 import android.os.IBinder;
-import android.os.PowerManager;
 import android.util.Log;
 
 import androidx.core.app.NotificationCompat;
@@ -45,6 +43,8 @@ public class MusicService extends Service implements MediaPlayer.OnPreparedListe
     private static final int STATE_RELEASED = 8;
 
     private int mCurrentState = STATE_ERROR;
+
+    private String mCurrentSource;
 
     private MediaPlayer mMediaPlayer = null;
 
@@ -122,6 +122,7 @@ public class MusicService extends Service implements MediaPlayer.OnPreparedListe
 
     public void openMusic(String path) {
         Log.d(TAG, "openMusic...path = " + path);
+        mCurrentSource = path;
         mMediaPlayer.reset();
         mCurrentState = STATE_IDLE;
         try {
@@ -147,6 +148,10 @@ public class MusicService extends Service implements MediaPlayer.OnPreparedListe
             Log.w(TAG, "Unable to open content: " + path, ex);
             this.onError(mMediaPlayer, MediaPlayer.MEDIA_ERROR_UNKNOWN, 0);
         }
+    }
+
+    public String getCurrentSource() {
+        return mCurrentSource;
     }
 
     @Override

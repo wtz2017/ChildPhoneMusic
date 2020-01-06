@@ -77,6 +77,8 @@ public class MusicPlayer extends AppCompatActivity implements View.OnClickListen
     private int mPlayMode = PLAY_MODE_REPEAT;
     private int mInitPlayMode;
 
+    private boolean isPaused;
+
     private SharedPreferences mSp;
 
     private static final int UPDATE_PLAY_TIME_INTERVAL = 300;
@@ -130,7 +132,11 @@ public class MusicPlayer extends AppCompatActivity implements View.OnClickListen
 
         if (!initData(intent)) return;
 
-        startNewAudio();
+        if (!isServiceOK()) return;
+
+        if ((!isPlaying() && !isPaused) || !mCurrentItem.path.equals(mService.getCurrentSource())) {
+            startNewAudio();
+        }
     }
 
     @Override
@@ -454,6 +460,7 @@ public class MusicPlayer extends AppCompatActivity implements View.OnClickListen
     private void play() {
         if (isServiceOK()) {
             mService.start();
+            isPaused = false;
             ivPlay.setImageResource(R.drawable.pause_image_selector);
             startTimeUpdate();
         }
@@ -462,6 +469,7 @@ public class MusicPlayer extends AppCompatActivity implements View.OnClickListen
     private void pause() {
         if (isServiceOK()) {
             mService.pause();
+            isPaused = true;
             ivPlay.setImageResource(R.drawable.play_image_selector);
             stopTimeUpdate();
         }
@@ -492,6 +500,7 @@ public class MusicPlayer extends AppCompatActivity implements View.OnClickListen
             mService.stop();
             stopTimeUpdate();
         }
+        isPaused = false;
     }
 
     private void releasePlayService() {
