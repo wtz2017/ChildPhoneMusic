@@ -64,8 +64,6 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
     }
 
     private SharedPreferences mSp;
-    private static final String SP_NAME = "config";
-    private static final String SP_KEY_LAST_AUDIO_PATH = "sp_key_last_audio_path";
     private String mLastAudioPath;
     private String mRootPath;
 
@@ -184,8 +182,8 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
     private void initAudioDir() {
         mRootPath = Environment.getExternalStorageDirectory().getAbsolutePath();
         LogUtils.d(TAG, "mRootPath=" + mRootPath);
-        mSp = getSharedPreferences(SP_NAME, Context.MODE_PRIVATE);
-        mLastAudioPath = mSp.getString(SP_KEY_LAST_AUDIO_PATH, mRootPath);
+        mSp = Preferences.getSP(this);
+        mLastAudioPath = mSp.getString(Preferences.KEY_LAST_AUDIO_PATH, mRootPath);
         mCurrentPathView.setText(mLastAudioPath);
     }
 
@@ -314,7 +312,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
             return;
         }
         SharedPreferences.Editor editor = mSp.edit();
-        editor.putString(SP_KEY_LAST_AUDIO_PATH, path);
+        editor.putString(Preferences.KEY_LAST_AUDIO_PATH, path);
         editor.apply();
     }
 

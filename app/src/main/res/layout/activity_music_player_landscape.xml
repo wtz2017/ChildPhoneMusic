@@ -83,9 +83,8 @@
                 android:id="@+id/iv_play"
                 android:layout_width="@dimen/dp_50"
                 android:layout_height="@dimen/dp_50"
-                android:layout_marginLeft="@dimen/dp_20"
-                android:layout_marginRight="@dimen/dp_20"
-                android:layout_toRightOf="@id/iv_pre"
+                android:layout_marginLeft="@dimen/dp_16"
+                android:layout_marginRight="@dimen/dp_16"
                 android:focusable="true"
                 android:focusableInTouchMode="true"
                 android:src="@drawable/pause_image_selector" />
@@ -94,10 +93,18 @@
                 android:id="@+id/iv_next"
                 android:layout_width="@dimen/dp_50"
                 android:layout_height="@dimen/dp_50"
-                android:layout_alignParentRight="true"
                 android:focusable="true"
                 android:focusableInTouchMode="true"
                 android:src="@drawable/next_image_selector" />
+
+            <ImageView
+                android:id="@+id/iv_play_mode"
+                android:layout_width="@dimen/dp_50"
+                android:layout_height="@dimen/dp_50"
+                android:layout_marginLeft="@dimen/dp_16"
+                android:focusable="true"
+                android:focusableInTouchMode="true"
+                android:src="@drawable/repeat_play" />
         </LinearLayout>
     </LinearLayout>
 

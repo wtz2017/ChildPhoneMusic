@@ -4,6 +4,7 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.ServiceConnection;
+import android.content.SharedPreferences;
 import android.content.res.Configuration;
 import android.graphics.Bitmap;
 import android.graphics.drawable.Drawable;
@@ -70,6 +71,13 @@ public class MusicPlayer extends AppCompatActivity implements View.OnClickListen
     private ImageView ivPre;
     private ImageView ivPlay;
     private ImageView ivNext;
+    private ImageView ivPlayMode;
+    private static final int PLAY_MODE_REPEAT = 0;
+    private static final int PLAY_MODE_ORDER = 1;
+    private int mPlayMode = PLAY_MODE_REPEAT;
+    private int mInitPlayMode;
+
+    private SharedPreferences mSp;
 
     private static final int UPDATE_PLAY_TIME_INTERVAL = 300;
     private static final int DELAY_UPDATE_ALBUM_TIME = 700;
@@ -107,6 +115,7 @@ public class MusicPlayer extends AppCompatActivity implements View.OnClickListen
 
         if (!initData(getIntent())) return;
 
+        initPlayMode();
         configView();
 
         Intent playService = new Intent(this, MusicService.class);
@@ -156,6 +165,7 @@ public class MusicPlayer extends AppCompatActivity implements View.OnClickListen
             setContentView(R.layout.activity_music_player_landscape);
         }
         initViews();
+        updatePlayTime();// 考虑播放半途中切屏场景
     }
 
     private boolean initData(Intent intent) {
@@ -209,6 +219,18 @@ public class MusicPlayer extends AppCompatActivity implements View.OnClickListen
         ivNext = (ImageView) this.findViewById(R.id.iv_next);
         ivNext.setOnClickListener(this);
         ivNext.setOnTouchListener(this);
+
+        ivPlayMode = (ImageView) this.findViewById(R.id.iv_play_mode);
+        ivPlayMode.setOnClickListener(this);
+        ivPlayMode.setOnTouchListener(this);
+        switch (mPlayMode) {
+            case PLAY_MODE_REPEAT:
+                ivPlayMode.setImageResource(R.drawable.repeat_play);
+                break;
+            case PLAY_MODE_ORDER:
+                ivPlayMode.setImageResource(R.drawable.order_play);
+                break;
+        }
     }
 
     private void setAlbumLayout(ImageView album) {
@@ -284,6 +306,15 @@ public class MusicPlayer extends AppCompatActivity implements View.OnClickListen
                     play();
                 }
                 break;
+            case R.id.iv_play_mode:
+                if (mPlayMode == PLAY_MODE_REPEAT) {
+                    ivPlayMode.setImageResource(R.drawable.order_play);
+                    mPlayMode = PLAY_MODE_ORDER;
+                } else if (mPlayMode == PLAY_MODE_ORDER) {
+                    ivPlayMode.setImageResource(R.drawable.repeat_play);
+                    mPlayMode = PLAY_MODE_REPEAT;
+                }
+                break;
         }
     }
 
@@ -298,6 +329,9 @@ public class MusicPlayer extends AppCompatActivity implements View.OnClickListen
                 break;
             case R.id.iv_play:
                 ivPlay.requestFocus();
+                break;
+            case R.id.iv_play_mode:
+                ivPlayMode.requestFocus();
                 break;
         }
         return false;
@@ -357,7 +391,11 @@ public class MusicPlayer extends AppCompatActivity implements View.OnClickListen
         @Override
         public void onCompletion(MediaPlayer mp) {
             LogUtils.d(TAG, "onCompletion");
-            next();
+            if (mPlayMode == PLAY_MODE_ORDER) {
+                next();
+            } else if (mPlayMode == PLAY_MODE_REPEAT) {
+                openAudio();
+            }
         }
     };
 
@@ -484,14 +522,12 @@ public class MusicPlayer extends AppCompatActivity implements View.OnClickListen
             mPlayPositionMsec = mPlaySeekBar.getProgress();
             String currentPosition = DateTimeUtil.changeRemainTimeToHms(mPlayPositionMsec);
             mPlayTimeView.setText(currentPosition + "/" + mDurationText);
-        } else if (isPlaying()) {
+        } else {
             // 没有 seek 时，如果还在播放中，就正常按实际播放时间更新时间和 seekbar
             mPlayPositionMsec = getCurrentPosition();
             String currentPosition = DateTimeUtil.changeRemainTimeToHms(mPlayPositionMsec);
             mPlayTimeView.setText(currentPosition + "/" + mDurationText);
             mPlaySeekBar.setProgress(mPlayPositionMsec);
-        } else {
-            // 既没有 seek，也没有播放，那就不更新
         }
     }
 
@@ -546,6 +582,21 @@ public class MusicPlayer extends AppCompatActivity implements View.OnClickListen
         });
     }
 
+    private void initPlayMode() {
+        mSp = Preferences.getSP(this);
+        mInitPlayMode = mSp.getInt(Preferences.KEY_AUDIO_PLAY_MODE, PLAY_MODE_REPEAT);
+        mPlayMode = mInitPlayMode;
+    }
+
+    private void savePlayMode(int mode) {
+        if (mSp == null) {
+            return;
+        }
+        SharedPreferences.Editor editor = mSp.edit();
+        editor.putInt(Preferences.KEY_AUDIO_PLAY_MODE, mode);
+        editor.apply();
+    }
+
     @Override
     protected void onPause() {
         LogUtils.d(TAG, "onPause");
@@ -561,6 +612,9 @@ public class MusicPlayer extends AppCompatActivity implements View.OnClickListen
     @Override
     protected void onDestroy() {
         LogUtils.d(TAG, "onDestroy");
+        if (mInitPlayMode != mPlayMode) {
+            savePlayMode(mPlayMode);
+        }
         if (mAsyncTaskExecutor != null) {
             mAsyncTaskExecutor.shutdown();
             mAsyncTaskExecutor = null;
