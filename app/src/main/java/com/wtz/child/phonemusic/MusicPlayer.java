@@ -1,8 +1,10 @@
 package com.wtz.child.phonemusic;
 
+import android.content.BroadcastReceiver;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.ServiceConnection;
 import android.content.SharedPreferences;
 import android.content.res.Configuration;
@@ -26,6 +28,7 @@ import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 
 import com.squareup.picasso.Picasso;
 import com.wtz.child.phonemusic.data.Item;
@@ -133,6 +136,9 @@ public class MusicPlayer extends AppCompatActivity implements View.OnClickListen
         requestWindowFeature(Window.FEATURE_NO_TITLE);
         getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN,
                 WindowManager.LayoutParams.FLAG_FULLSCREEN);
+
+        LocalBroadcastManager.getInstance(this)
+                .registerReceiver(mBroadcastReceiver, new IntentFilter(App.ACTION_STOP_PLAY));
 
         if (!initData(getIntent())) return;
 
@@ -746,7 +752,20 @@ public class MusicPlayer extends AppCompatActivity implements View.OnClickListen
             mMusicList = null;
         }
         mHandler.removeCallbacksAndMessages(null);
+        LocalBroadcastManager.getInstance(this).sendBroadcast(new Intent(App.ACTION_PLAY_STOPPED));
+        LocalBroadcastManager.getInstance(this).unregisterReceiver(mBroadcastReceiver);
         super.onDestroy();
     }
+
+    private BroadcastReceiver mBroadcastReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            String action = intent.getAction();
+            LogUtils.d(TAG, "onReceive: " + action);
+            if (App.ACTION_STOP_PLAY.equals(action)) {
+                finish();
+            }
+        }
+    };
 
 }

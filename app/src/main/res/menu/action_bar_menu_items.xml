@@ -3,6 +3,12 @@
     xmlns:app="http://schemas.android.com/apk/res-auto">
 
     <item
+        android:id="@+id/menu_item_stop"
+        android:icon="@drawable/stop"
+        android:title="停止"
+        app:showAsAction="always" />
+
+    <item
         android:id="@+id/menu_item_setting"
         android:icon="@drawable/setting"
         android:title="设置"

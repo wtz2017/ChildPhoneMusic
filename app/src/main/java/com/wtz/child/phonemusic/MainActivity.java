@@ -2,8 +2,10 @@ package com.wtz.child.phonemusic;
 
 import android.Manifest;
 import android.app.Dialog;
+import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.content.res.Configuration;
 import android.os.Bundle;
@@ -28,6 +30,7 @@ import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 
 import com.wtz.child.phonemusic.adapter.MusicGridAdapter;
 import com.wtz.child.phonemusic.data.Item;
@@ -81,12 +84,16 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
 
     private PermissionHandler mPermissionHandler;
 
+    private MenuItem mStopPlayMenu;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         LogUtils.d(TAG, "onCreate");
         super.onCreate(savedInstanceState);
 
         mSp = Preferences.getInstance().getSP();
+        LocalBroadcastManager.getInstance(this)
+                .registerReceiver(mBroadcastReceiver, new IntentFilter(App.ACTION_PLAY_STOPPED));
 
         configView();
 
@@ -104,14 +111,20 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
         getMenuInflater().inflate(R.menu.action_bar_menu_items, menu);
+        mStopPlayMenu = menu.findItem(R.id.menu_item_stop);
+        mStopPlayMenu.setVisible(false);
         return true;
     }
 
     @Override
     public boolean onOptionsItemSelected(@NonNull MenuItem item) {
-        if (item.getItemId() == R.id.menu_item_setting) {
-            showAuthenticationDialog(this);
-            return true;
+        switch (item.getItemId()) {
+            case R.id.menu_item_stop:
+                stopPlay();
+                return true;
+            case R.id.menu_item_setting:
+                showAuthenticationDialog(this);
+                return true;
         }
         return false;
     }
@@ -257,6 +270,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         i.putExtra(MusicPlayer.KEY_MUSIC_LIST, mAudioList);
         i.putExtra(MusicPlayer.KEY_MUSIC_INDEX, index);
         startActivity(i);
+        mStopPlayMenu.setVisible(true);
     }
 
     private void updateGridview() {
@@ -539,6 +553,10 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         dialog.show();
     }
 
+    private void stopPlay() {
+        LocalBroadcastManager.getInstance(this).sendBroadcast(new Intent(App.ACTION_STOP_PLAY));
+    }
+
     @Override
     protected void onPause() {
         LogUtils.d(TAG, "onPause");
@@ -562,7 +580,19 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         mHandler.removeCallbacksAndMessages(null);
         mTotalList.clear();
         mAudioList.clear();
+        LocalBroadcastManager.getInstance(this).unregisterReceiver(mBroadcastReceiver);
         super.onDestroy();
     }
+
+    private BroadcastReceiver mBroadcastReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            String action = intent.getAction();
+            LogUtils.d(TAG, "onReceive: " + action);
+            if (App.ACTION_PLAY_STOPPED.equals(action)) {
+                mStopPlayMenu.setVisible(false);
+            }
+        }
+    };
 
 }
