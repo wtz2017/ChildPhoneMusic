@@ -52,6 +52,9 @@ public class MusicPlayer extends AppCompatActivity implements View.OnClickListen
     private Item mCurrentItem;
     private boolean isBackward = true;// 向后切换音频
 
+    private LinearLayout llPlayLayout;
+    private LinearLayout llRestLayout;
+
     private ImageView ivAlbum;
     private int mAlbumWidth;
     private int mAlbumHeight;
@@ -63,7 +66,7 @@ public class MusicPlayer extends AppCompatActivity implements View.OnClickListen
     private TextView mPlayTimeView;
     private int mDurationMsec;
     private int mPlayPositionMsec;
-    private String mDurationText;
+    private String mDurationText = "00:00:00";
 
     private SeekBar mPlaySeekBar;
     private boolean isSeeking;
@@ -77,14 +80,19 @@ public class MusicPlayer extends AppCompatActivity implements View.OnClickListen
     private int mPlayMode = PLAY_MODE_REPEAT;
     private int mInitPlayMode;
 
+    private TextView tvRestTime;
+
     private boolean isPaused;
+    private boolean isPrepared;
 
     private SharedPreferences mSp;
 
     private static final int UPDATE_PLAY_TIME_INTERVAL = 300;
+    private static final int UPDATE_REST_TIME_INTERVAL = 300;
     private static final int DELAY_UPDATE_ALBUM_TIME = 700;
     private static final int MSG_UPDATE_PLAY_TIME = 1;
-    private static final int MSG_UPDATE_ALBUM = 2;
+    private static final int MSG_UPDATE_REST_TIME = 2;
+    private static final int MSG_UPDATE_ALBUM = 3;
     private Handler mHandler = new Handler(Looper.getMainLooper()) {
         @Override
         public void handleMessage(@NonNull Message msg) {
@@ -93,6 +101,17 @@ public class MusicPlayer extends AppCompatActivity implements View.OnClickListen
                     updatePlayTime();
                     removeMessages(MSG_UPDATE_PLAY_TIME);
                     sendEmptyMessageDelayed(MSG_UPDATE_PLAY_TIME, UPDATE_PLAY_TIME_INTERVAL);
+                    break;
+                case MSG_UPDATE_REST_TIME:
+                    if (TimeManager.getInstance().getRestTimeLength() > 0) {
+                        updateRestTime();
+                        removeMessages(MSG_UPDATE_REST_TIME);
+                        sendEmptyMessageDelayed(MSG_UPDATE_REST_TIME, UPDATE_REST_TIME_INTERVAL);
+                    } else {
+                        setPlayUISate();
+                        TimeManager.getInstance().saveTime();
+                        removeMessages(MSG_UPDATE_REST_TIME);
+                    }
                     break;
                 case MSG_UPDATE_ALBUM:
                     updateAlbum();
@@ -118,10 +137,17 @@ public class MusicPlayer extends AppCompatActivity implements View.OnClickListen
         if (!initData(getIntent())) return;
 
         initPlayMode();
+
         configView();
 
         Intent playService = new Intent(this, MusicService.class);
         bindService(playService, mConnection, Context.BIND_AUTO_CREATE);
+
+        if (TimeManager.getInstance().canPlay()) {
+            setPlayUISate();
+        } else {
+            setRestUISate();
+        }
     }
 
     @Override
@@ -134,8 +160,13 @@ public class MusicPlayer extends AppCompatActivity implements View.OnClickListen
 
         if (!isServiceOK()) return;
 
-        if ((!isPlaying() && !isPaused) || !mCurrentItem.path.equals(mService.getCurrentSource())) {
-            startNewAudio();
+        if (TimeManager.getInstance().canPlay()) {
+            setPlayUISate();
+            if ((!isPlaying() && !isPaused) || !mCurrentItem.path.equals(mService.getCurrentSource())) {
+                startNewAudio();
+            }
+        } else {
+            setRestUISate();
         }
     }
 
@@ -160,6 +191,12 @@ public class MusicPlayer extends AppCompatActivity implements View.OnClickListen
             mAlbumDrawable = ivAlbum.getDrawable();
         }
         configView();
+
+        if (TimeManager.getInstance().canPlay()) {
+            setPlayUISate();
+        } else {
+            setRestUISate();
+        }
     }
 
     private void configView() {
@@ -195,6 +232,9 @@ public class MusicPlayer extends AppCompatActivity implements View.OnClickListen
     }
 
     private void initViews() {
+        llPlayLayout = findViewById(R.id.ll_play_layout);
+        llRestLayout = findViewById(R.id.ll_rest_layout);;
+
         ivAlbum = findViewById(R.id.iv_album);
         setAlbumLayout(ivAlbum);
         if (mAlbumDrawable != null) {
@@ -208,6 +248,7 @@ public class MusicPlayer extends AppCompatActivity implements View.OnClickListen
         tvName.setText(mMusicList.get(mIndex).name);
 
         mPlayTimeView = findViewById(R.id.tv_play_time);
+        tvRestTime = findViewById(R.id.tv_rest_time);
 
         mPlaySeekBar = findViewById(R.id.seek_bar_play);
         setSeekbarWith(mPlaySeekBar);
@@ -237,6 +278,38 @@ public class MusicPlayer extends AppCompatActivity implements View.OnClickListen
                 ivPlayMode.setImageResource(R.drawable.order_play);
                 break;
         }
+    }
+
+    private void setPlayUISate() {
+        llPlayLayout.setVisibility(View.VISIBLE);
+        llRestLayout.setVisibility(View.GONE);
+
+        stopUpdateRestTime();
+    }
+
+    private void setRestUISate() {
+        stopPlay();
+        ivPlay.setImageResource(R.drawable.play_image_selector);
+
+        llPlayLayout.setVisibility(View.GONE);
+        llRestLayout.setVisibility(View.VISIBLE);
+
+        startUpdateRestTime();
+    }
+
+    private void startUpdateRestTime() {
+        mHandler.removeMessages(MSG_UPDATE_REST_TIME);
+        mHandler.sendEmptyMessage(MSG_UPDATE_REST_TIME);
+    }
+
+    private void stopUpdateRestTime() {
+        mHandler.removeMessages(MSG_UPDATE_REST_TIME);
+    }
+
+    private void updateRestTime() {
+        String time = DateTimeUtil.changeRemainTimeToHms(
+                TimeManager.getInstance().getRestTimeLength());
+        tvRestTime.setText(time);
     }
 
     private void setAlbumLayout(ImageView album) {
@@ -309,7 +382,11 @@ public class MusicPlayer extends AppCompatActivity implements View.OnClickListen
                 if (isPlaying()) {
                     pause();
                 } else {
-                    play();
+                    if (isPrepared) {
+                        play();
+                    } else {
+                        startNewAudio();
+                    }
                 }
                 break;
             case R.id.iv_play_mode:
@@ -355,7 +432,10 @@ public class MusicPlayer extends AppCompatActivity implements View.OnClickListen
             mBound = true;
 
             initPlayService();
-            startNewAudio();
+
+            if (TimeManager.getInstance().canPlay()) {
+                startNewAudio();
+            }
         }
 
         @Override
@@ -385,6 +465,7 @@ public class MusicPlayer extends AppCompatActivity implements View.OnClickListen
     private MediaPlayer.OnPreparedListener mOnPreparedListener = new MediaPlayer.OnPreparedListener() {
         @Override
         public void onPrepared(MediaPlayer mp) {
+            isPrepared = true;
             mDurationMsec = getDuration();
             LogUtils.d(TAG, "onPrepared mDurationMsec=" + mDurationMsec);
             mPlaySeekBar.setMax(mDurationMsec);
@@ -397,10 +478,15 @@ public class MusicPlayer extends AppCompatActivity implements View.OnClickListen
         @Override
         public void onCompletion(MediaPlayer mp) {
             LogUtils.d(TAG, "onCompletion");
-            if (mPlayMode == PLAY_MODE_ORDER) {
-                next();
-            } else if (mPlayMode == PLAY_MODE_REPEAT) {
-                openAudio();
+            TimeManager.getInstance().stopPlayTiming();
+            if (TimeManager.getInstance().canPlay()) {
+                if (mPlayMode == PLAY_MODE_ORDER) {
+                    next();
+                } else if (mPlayMode == PLAY_MODE_REPEAT) {
+                    openAudio();
+                }
+            } else {
+                setRestUISate();
             }
         }
     };
@@ -419,6 +505,7 @@ public class MusicPlayer extends AppCompatActivity implements View.OnClickListen
     };
 
     private void openAudio() {
+        isPrepared = false;
         if (isServiceOK()) {
             mService.openMusic(mCurrentItem.path);
         }
@@ -450,11 +537,16 @@ public class MusicPlayer extends AppCompatActivity implements View.OnClickListen
 
     private void startNewAudio() {
         resetPlayUI();
-        stop();
+        stopPlay();
 
         tvName.setText(mCurrentItem.name);
         startUpdateAlbum();
-        openAudio();
+
+        if (TimeManager.getInstance().canPlay()) {
+            openAudio();
+        } else {
+            setRestUISate();
+        }
     }
 
     private void play() {
@@ -463,6 +555,7 @@ public class MusicPlayer extends AppCompatActivity implements View.OnClickListen
             isPaused = false;
             ivPlay.setImageResource(R.drawable.pause_image_selector);
             startTimeUpdate();
+            TimeManager.getInstance().startPlayTiming();
         }
     }
 
@@ -472,6 +565,10 @@ public class MusicPlayer extends AppCompatActivity implements View.OnClickListen
             isPaused = true;
             ivPlay.setImageResource(R.drawable.play_image_selector);
             stopTimeUpdate();
+            TimeManager.getInstance().stopPlayTiming();
+            if (!TimeManager.getInstance().canPlay()) {
+                setRestUISate();
+            }
         }
     }
 
@@ -495,12 +592,14 @@ public class MusicPlayer extends AppCompatActivity implements View.OnClickListen
         return 0;
     }
 
-    private void stop() {
+    private void stopPlay() {
         if (isServiceOK()) {
             mService.stop();
-            stopTimeUpdate();
         }
+        stopTimeUpdate();
+        TimeManager.getInstance().stopPlayTiming();
         isPaused = false;
+        isPrepared = false;
     }
 
     private void releasePlayService() {
@@ -592,7 +691,7 @@ public class MusicPlayer extends AppCompatActivity implements View.OnClickListen
     }
 
     private void initPlayMode() {
-        mSp = Preferences.getSP(this);
+        mSp = Preferences.getInstance().getSP();
         mInitPlayMode = mSp.getInt(Preferences.KEY_AUDIO_PLAY_MODE, PLAY_MODE_REPEAT);
         mPlayMode = mInitPlayMode;
     }
@@ -621,21 +720,27 @@ public class MusicPlayer extends AppCompatActivity implements View.OnClickListen
     @Override
     protected void onDestroy() {
         LogUtils.d(TAG, "onDestroy");
+        stopPlay();
+        stopUpdateRestTime();
+
+        TimeManager.getInstance().saveTime();
         if (mInitPlayMode != mPlayMode) {
             savePlayMode(mPlayMode);
         }
+
         if (mAsyncTaskExecutor != null) {
             mAsyncTaskExecutor.shutdown();
             mAsyncTaskExecutor = null;
         }
         mAlbumDrawable = null;
-        stop();
+
         releasePlayService();
         if (mBound) {
             unbindService(mConnection);
             mService = null;
             mBound = false;
         }
+
         if (mMusicList != null) {
             mMusicList.clear();
             mMusicList = null;

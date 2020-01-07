@@ -1,6 +1,7 @@
 package com.wtz.child.phonemusic;
 
 import android.Manifest;
+import android.app.Dialog;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
@@ -9,10 +10,18 @@ import android.os.Bundle;
 import android.os.Environment;
 import android.os.Handler;
 import android.os.Looper;
+import android.text.Editable;
 import android.text.TextUtils;
+import android.view.Gravity;
 import android.view.KeyEvent;
+import android.view.Menu;
+import android.view.MenuItem;
 import android.view.View;
+import android.view.Window;
+import android.view.WindowManager;
 import android.widget.AdapterView;
+import android.widget.Button;
+import android.widget.EditText;
 import android.widget.GridView;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -23,6 +32,7 @@ import androidx.appcompat.app.AppCompatActivity;
 import com.wtz.child.phonemusic.adapter.MusicGridAdapter;
 import com.wtz.child.phonemusic.data.Item;
 import com.wtz.child.phonemusic.utils.LogUtils;
+import com.wtz.child.phonemusic.utils.Md5Util;
 import com.wtz.child.phonemusic.utils.PermissionChecker;
 import com.wtz.child.phonemusic.utils.PermissionHandler;
 import com.wtz.child.phonemusic.utils.ScreenUtils;
@@ -76,6 +86,8 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         LogUtils.d(TAG, "onCreate");
         super.onCreate(savedInstanceState);
 
+        mSp = Preferences.getInstance().getSP();
+
         configView();
 
         mPermissionHandler = new PermissionHandler(this, mPermissionHandleListener);
@@ -87,6 +99,21 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         // 由于是桌面应用的主 Activity，且设置了 singleInstance 模式，按 Home 键时会调用此方法
         LogUtils.d(TAG, "onNewIntent " + intent);
         super.onNewIntent(intent);
+    }
+
+    @Override
+    public boolean onCreateOptionsMenu(Menu menu) {
+        getMenuInflater().inflate(R.menu.action_bar_menu_items, menu);
+        return true;
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(@NonNull MenuItem item) {
+        if (item.getItemId() == R.id.menu_item_setting) {
+            showAuthenticationDialog(this);
+            return true;
+        }
+        return false;
     }
 
     @Override
@@ -182,7 +209,6 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
     private void initAudioDir() {
         mRootPath = Environment.getExternalStorageDirectory().getAbsolutePath();
         LogUtils.d(TAG, "mRootPath=" + mRootPath);
-        mSp = Preferences.getSP(this);
         mLastAudioPath = mSp.getString(Preferences.KEY_LAST_AUDIO_PATH, mRootPath);
         mCurrentPathView.setText(mLastAudioPath);
     }
@@ -314,6 +340,203 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         SharedPreferences.Editor editor = mSp.edit();
         editor.putString(Preferences.KEY_LAST_AUDIO_PATH, path);
         editor.apply();
+    }
+
+    private void showAuthenticationDialog(Context context) {
+        final Dialog dialog = new Dialog(context, R.style.NormalDialogStyle);
+        View view = View.inflate(context, R.layout.dialog_authentication, null);
+        final EditText etPassWord = view.findViewById(R.id.et_password);
+        Button cancel = view.findViewById(R.id.btn_cancel);
+        Button confirm = view.findViewById(R.id.btn_confirm);
+        dialog.setContentView(view);
+
+        int[] screenSize = ScreenUtils.getScreenPixels(context);
+        view.setMinimumHeight((int) (screenSize[1] * 0.23f));
+        Window dialogWindow = dialog.getWindow();
+        WindowManager.LayoutParams lp = dialogWindow.getAttributes();
+        lp.width = (int) (screenSize[0] * 0.80f);
+        lp.height = WindowManager.LayoutParams.WRAP_CONTENT;
+        lp.gravity = Gravity.CENTER;
+        dialogWindow.setAttributes(lp);
+
+        cancel.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                dialog.dismiss();
+            }
+        });
+        confirm.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                Editable pwdEdit = etPassWord.getText();
+                if (pwdEdit == null) {
+                    Toast.makeText(v.getContext(), "请输入密码", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                String pwdStr = pwdEdit.toString();
+                if (TextUtils.isEmpty(pwdStr)) {
+                    Toast.makeText(v.getContext(), "请输入密码", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+
+                String pwdMd5 = Md5Util.getStringMD5(pwdStr);
+                String realMd5 = mSp.getString(Preferences.KEY_PASS_WORD, "");
+                if (TextUtils.isEmpty(realMd5)) {
+                    realMd5 = Md5Util.getStringMD5(Preferences.DEFAULT_PASS_WORD);
+                }
+                if (!realMd5.equals(pwdMd5)) {
+                    Toast.makeText(v.getContext(), "密码错误", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+
+                dialog.dismiss();
+                showSettingDialog(v.getContext());
+            }
+        });
+
+        //使得点击对话框外部不消失对话框
+        dialog.setCanceledOnTouchOutside(false);
+        dialog.show();
+    }
+
+    private void showSettingDialog(Context context) {
+        final Dialog dialog = new Dialog(context, R.style.NormalDialogStyle);
+        View view = View.inflate(context, R.layout.dialog_setting, null);
+        Button setTime = view.findViewById(R.id.btn_set_time);
+        Button setPwd = view.findViewById(R.id.btn_set_pwd);
+        dialog.setContentView(view);
+
+        int[] screenSize = ScreenUtils.getScreenPixels(context);
+        view.setMinimumHeight((int) (screenSize[1] * 0.23f));
+        Window dialogWindow = dialog.getWindow();
+        WindowManager.LayoutParams lp = dialogWindow.getAttributes();
+        lp.width = (int) (screenSize[0] * 0.80f);
+        lp.height = WindowManager.LayoutParams.WRAP_CONTENT;
+        lp.gravity = Gravity.CENTER;
+        dialogWindow.setAttributes(lp);
+
+        setTime.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                dialog.dismiss();
+                showTimeSettingDialog(v.getContext());
+            }
+        });
+        setPwd.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                dialog.dismiss();
+                showPwdSettingDialog(v.getContext());
+            }
+        });
+
+        //使得点击对话框外部不消失对话框
+        dialog.setCanceledOnTouchOutside(false);
+        dialog.show();
+    }
+
+    private void showTimeSettingDialog(Context context) {
+        final Dialog dialog = new Dialog(context, R.style.NormalDialogStyle);
+
+        View view = View.inflate(context, R.layout.dialog_time_setting, null);
+        final EditText etMaxPlayTime = view.findViewById(R.id.et_max_play_time);
+        final EditText etPlanRestTime = view.findViewById(R.id.et_plan_rest_time);
+        Button cancel = view.findViewById(R.id.btn_cancel);
+        Button confirm = view.findViewById(R.id.btn_confirm);
+        dialog.setContentView(view);
+
+        etMaxPlayTime.setText("" + TimeManager.getInstance().getMaxPlayTimeMinutes());
+        etPlanRestTime.setText("" + TimeManager.getInstance().getPlanRestTimeMinutes());
+
+        int[] screenSize = ScreenUtils.getScreenPixels(context);
+        view.setMinimumHeight((int) (screenSize[1] * 0.23f));
+        Window dialogWindow = dialog.getWindow();
+        WindowManager.LayoutParams lp = dialogWindow.getAttributes();
+        lp.width = (int) (screenSize[0] * 0.80f);
+        lp.height = WindowManager.LayoutParams.WRAP_CONTENT;
+        lp.gravity = Gravity.CENTER;
+        dialogWindow.setAttributes(lp);
+
+        cancel.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                dialog.dismiss();
+            }
+        });
+        confirm.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                String maxPlayTimeStr;
+                if (etMaxPlayTime.getText() != null
+                        && !TextUtils.isEmpty((maxPlayTimeStr = etMaxPlayTime.getText().toString()))) {
+                    int maxPlayTimeMinutes = Integer.parseInt(maxPlayTimeStr);
+                    TimeManager.getInstance().setMaxPlayTimeMinutes(maxPlayTimeMinutes);
+                }
+
+                String planRestTimeStr;
+                if (etPlanRestTime.getText() != null
+                        && !TextUtils.isEmpty((planRestTimeStr = etPlanRestTime.getText().toString()))) {
+                    int planRestTime = Integer.parseInt(planRestTimeStr);
+                    TimeManager.getInstance().setPlanRestTimeMinutes(planRestTime);
+                }
+
+                dialog.dismiss();
+            }
+        });
+
+        //使得点击对话框外部不消失对话框
+        dialog.setCanceledOnTouchOutside(false);
+        dialog.show();
+    }
+
+    private void showPwdSettingDialog(Context context) {
+        final Dialog dialog = new Dialog(context, R.style.NormalDialogStyle);
+        View view = View.inflate(context, R.layout.dialog_pwd_setting, null);
+        final EditText etPwd = view.findViewById(R.id.et_set_new_pwd);
+        Button cancel = view.findViewById(R.id.btn_cancel);
+        Button confirm = view.findViewById(R.id.btn_confirm);
+        dialog.setContentView(view);
+
+        int[] screenSize = ScreenUtils.getScreenPixels(context);
+        view.setMinimumHeight((int) (screenSize[1] * 0.23f));
+        Window dialogWindow = dialog.getWindow();
+        WindowManager.LayoutParams lp = dialogWindow.getAttributes();
+        lp.width = (int) (screenSize[0] * 0.80f);
+        lp.height = WindowManager.LayoutParams.WRAP_CONTENT;
+        lp.gravity = Gravity.CENTER;
+        dialogWindow.setAttributes(lp);
+
+        cancel.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                dialog.dismiss();
+            }
+        });
+        confirm.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                Editable pwdEdit = etPwd.getText();
+                if (pwdEdit == null) {
+                    Toast.makeText(v.getContext(), "请输入密码", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                String pwdStr = pwdEdit.toString();
+                if (TextUtils.isEmpty(pwdStr)) {
+                    Toast.makeText(v.getContext(), "请输入密码", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+
+                String pwdMd5 = Md5Util.getStringMD5(pwdStr);
+                SharedPreferences.Editor editor = mSp.edit();
+                editor.putString(Preferences.KEY_PASS_WORD, pwdMd5);
+                editor.apply();
+                dialog.dismiss();
+            }
+        });
+
+        //使得点击对话框外部不消失对话框
+        dialog.setCanceledOnTouchOutside(false);
+        dialog.show();
     }
 
     @Override
