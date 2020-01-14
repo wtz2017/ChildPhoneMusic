@@ -169,6 +169,10 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                     if (state == PermissionChecker.PermissionState.ALLOWED) {
                         initAudioDir();
                         updateGridview();
+                    } else if (state == PermissionChecker.PermissionState.UNKNOWN) {
+                        LogUtils.e(TAG, "onPermissionResult " + permission + " state is UNKNOWN!");
+                        initAudioDir();
+                        updateGridview();
                     } else {
                         LogUtils.e(TAG, "onPermissionResult " + permission + " is not allowed!");
                     }

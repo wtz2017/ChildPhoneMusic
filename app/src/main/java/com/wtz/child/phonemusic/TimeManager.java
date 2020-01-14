@@ -3,7 +3,6 @@ package com.wtz.child.phonemusic;
 import android.content.SharedPreferences;
 
 import com.wtz.child.phonemusic.utils.LogUtils;
-import com.wtz.child.phonemusic.utils.MusicIcon;
 
 public class TimeManager {
     private static final String TAG = "TimeManager";
@@ -11,6 +10,7 @@ public class TimeManager {
     private static TimeManager INSTANCE;
     private SharedPreferences mSp;
 
+    private long SELF_REST_MIN_TIME_LENGTH = 5 * 60 * 1000;// 判定为自觉休息最短时长，毫秒
     private long DEFAULT_MAX_PLAY_TIME_LENGTH = 15 * 60 * 1000;// 默认最大播放时长，毫秒
     private long mMaxPlayTimeLength = DEFAULT_MAX_PLAY_TIME_LENGTH;// 最大播放时长，毫秒
     private long DEFAULT_PLAN_REST_TIME_LENGTH = 10 * 60 * 1000;// 默认计划休息时长，毫秒
@@ -18,6 +18,7 @@ public class TimeManager {
 
     private boolean isPlayStarted;
     private long mStartPlayTimeStamp;//开始播放时间戳，毫秒
+    private long mLastStopTimeStamp;//最后一次停止播放时间戳，毫秒
     private long mPlayedTimeMill;//已播放时长，毫秒
     private long mRestTimeStamp;//休息时间戳，毫秒
 
@@ -39,6 +40,7 @@ public class TimeManager {
         mMaxPlayTimeLength = mSp.getLong(Preferences.KEY_MAX_PLAY_TIME_MILL, DEFAULT_MAX_PLAY_TIME_LENGTH);
         mPlanRestTimeLength = mSp.getLong(Preferences.KEY_PLAN_REST_TIME_MILL, DEFAULT_PLAN_REST_TIME_LENGTH);
         mPlayedTimeMill = mSp.getLong(Preferences.KEY_PLAYED_TIME_MILL, 0);
+        mLastStopTimeStamp = mSp.getLong(Preferences.KEY_LAST_STOP_TIME_STAMP, 0);
         mRestTimeStamp = mSp.getLong(Preferences.KEY_REST_TIME_STAMP, 0);
     }
 
@@ -69,6 +71,7 @@ public class TimeManager {
     public void saveTime() {
         SharedPreferences.Editor editor = mSp.edit();
         editor.putLong(Preferences.KEY_PLAYED_TIME_MILL, mPlayedTimeMill);
+        editor.putLong(Preferences.KEY_LAST_STOP_TIME_STAMP, mLastStopTimeStamp);
         editor.putLong(Preferences.KEY_REST_TIME_STAMP, mRestTimeStamp);
         editor.apply();
     }
@@ -77,13 +80,22 @@ public class TimeManager {
         if (!isPlayStarted) {
             mStartPlayTimeStamp = System.currentTimeMillis();
             isPlayStarted = true;
+            if (mStartPlayTimeStamp - mLastStopTimeStamp > SELF_REST_MIN_TIME_LENGTH) {
+                // 如果距离上次停止播放间隔大于一定时间，就认为自觉休息了一会儿，所以已播放时间清零
+                mPlayedTimeMill = 0;
+            }
         }
     }
 
     public void stopPlayTiming() {
         if (isPlayStarted) {
-            mPlayedTimeMill += System.currentTimeMillis() - mStartPlayTimeStamp;
+            mLastStopTimeStamp = System.currentTimeMillis();
+            mPlayedTimeMill += mLastStopTimeStamp - mStartPlayTimeStamp;
             isPlayStarted = false;
+            if (mPlayedTimeMill > mMaxPlayTimeLength) {
+                mRestTimeStamp = System.currentTimeMillis();
+                mPlayedTimeMill = 0;// 开始休息了，所以已播放时间清零
+            }
         }
     }
 
@@ -92,8 +104,6 @@ public class TimeManager {
             canPlay = false;
         } else if (mPlayedTimeMill > mMaxPlayTimeLength) {
             canPlay = false;
-            mRestTimeStamp = System.currentTimeMillis();
-            mPlayedTimeMill = 0;
         } else {
             canPlay = true;
         }

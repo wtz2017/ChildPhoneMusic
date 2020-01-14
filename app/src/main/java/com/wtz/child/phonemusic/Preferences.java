@@ -19,6 +19,7 @@ public class Preferences {
     public static final String KEY_MAX_PLAY_TIME_MILL = "max_play_time_mill";
     public static final String KEY_PLAN_REST_TIME_MILL = "plan_rest_time_mill";
     public static final String KEY_PLAYED_TIME_MILL = "played_time_mill";
+    public static final String KEY_LAST_STOP_TIME_STAMP = "last_stop_time_stamp";
     public static final String KEY_REST_TIME_STAMP = "rest_time_stamp";
 
     public static Preferences getInstance() {

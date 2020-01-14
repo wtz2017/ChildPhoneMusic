@@ -294,9 +294,7 @@ public class MusicPlayer extends AppCompatActivity implements View.OnClickListen
     }
 
     private void setRestUISate() {
-        stopPlay();
         ivPlay.setImageResource(R.drawable.play_image_selector);
-
         llPlayLayout.setVisibility(View.GONE);
         llRestLayout.setVisibility(View.VISIBLE);
 
@@ -492,6 +490,7 @@ public class MusicPlayer extends AppCompatActivity implements View.OnClickListen
                     openAudio();
                 }
             } else {
+                stopPlay();
                 setRestUISate();
             }
         }
@@ -573,6 +572,7 @@ public class MusicPlayer extends AppCompatActivity implements View.OnClickListen
             stopTimeUpdate();
             TimeManager.getInstance().stopPlayTiming();
             if (!TimeManager.getInstance().canPlay()) {
+                stopPlay();
                 setRestUISate();
             }
         }
